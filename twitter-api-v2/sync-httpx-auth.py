@@ -22,15 +22,15 @@ from typing import Final
 import dataclasses
 
 import structlog
+import keyring
 from authlib.integrations.httpx_client import OAuth2Client
 from rich import print
 
 logging.basicConfig(level=logging.DEBUG)
 logger = structlog.getLogger()
 
-client_id: str = os.environ["TWITTER_OAUTH2_CLIENT_ID"]
-client_secret: str = os.environ["TWITTER_OAUTH2_CLIENT_SECRET"]
-
+client_id: str = keyring.get_password("twitter_oauth2", "client_id")
+client_secret: str = keyring.get_password("twitter_oauth2", "client_secret")
 
 @dataclasses.dataclass(frozen=True)
 class AuthorizationRequestState:
