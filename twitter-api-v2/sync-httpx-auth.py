@@ -77,6 +77,7 @@ def open_authorization_in_browser() -> AuthorizationRequestState:
         "offline.access",
         "users.read",
         "tweet.read",
+        "tweet.write"
     ]
     code_verifier = secrets.token_urlsafe(10)
     auth_req_client = OAuth2Client(
@@ -118,6 +119,16 @@ def fetch_authorization_token(
     logger.info("fetch_token()", **token)
     return token
 
+def get_blocks(token: dict):
+    client = OAuth2Client(token=token)
+    user_id = "69190199"
+    blocks_url = f"https://api.twitter.com/2/users/{user_id}/blocking"
+    response = client.get(blocks_url, params={
+        "user.fields": "created_at"
+    })
+    print(response.json())
+
+
 
 def get_user_info(token: dict):
     client = OAuth2Client(
@@ -129,12 +140,22 @@ def get_user_info(token: dict):
     response = client.get(me_url, params=params)
     print(response.json())
 
+def tweet(token, content):
+    url = "https://api.twitter.com/2/tweets"
+    client = OAuth2Client(token=token)
+    response = client.post(url, json=dict(
+        text="asdf"
+    ))
+    print(response.json())
+
 
 def main():
     ars = open_authorization_in_browser()
     authorization_response = listen()
     token = fetch_authorization_token(ars, authorization_response)
     get_user_info(token)
+    #get_blocks(token)
+    tweet(token, "asdf")
 
 
 if __name__ == "__main__":
