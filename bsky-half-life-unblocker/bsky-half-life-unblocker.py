@@ -1,5 +1,4 @@
 import rich.console
-import atproto
 import asyncio
 import pydantic
 import pathlib
@@ -10,10 +9,20 @@ STATE_FILENAME = pathlib.Path.home() / ".bsky-half-life-unblocker-state.json"
 
 console = rich.console.Console()
 
+HALF_LIFE = 365 / 12 * 2
+THRESHOLD = 0.01
+
+background_tasks = set()
 
 def daystamp():
     """The unix timestamp but in 'days' instead of seconds."""
     return time.time() / (60 * 60 * 24)
+
+
+def run_background_task(coro):
+    task = asyncio.create_task(coro)
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
 
 
 class State(pydantic.BaseModel):
@@ -45,7 +54,8 @@ def keep_session_updated(client, state):
     client.on_session_change(on_session_change)
 
 
-async def fetch_all_block_records(client):
+async def fetch_all_block_records(client, probability):
+    import atproto
     records = {}
     cursor = None
     while True:
@@ -54,9 +64,22 @@ async def fetch_all_block_records(client):
             repo=client.me.did, cursor=cursor, limit=100
         )
         records.update(lrr.records)
+
+        for uri, record in lrr.records.items():
+            if random.random() >= probability:
+                # ...stays blocked.
+                continue
+
+            # trigger a background task to unblock this account
+            rkey = atproto.AtUri.from_str(uri).rkey
+            run_background_task(client.app.bsky.graph.block.delete(repo=client.me.did, rkey=rkey))
+            link = f"https://bsky.app/profile/{record.subject}"
+            console.print(f"Unblocking [link={link}]{record.subject}[/link]")
+
         cursor = lrr.cursor
         if cursor is None:
             break
+           
     console.log(f"fetched {len(records)} records")
     return records
 
@@ -70,6 +93,19 @@ def calculate_decay_probability(time, half_life):
 
 async def main():
     state = State.load()
+
+    current_daystamp = daystamp()
+    time_period = current_daystamp - state.last_unblock_run_daystamp
+    probability = calculate_decay_probability(time_period, HALF_LIFE)
+    console.log("Days since last run:", time_period)
+    console.log(f"Probability of unblocking per account: {probability:%}")
+
+    threshold = THRESHOLD
+    if probability < threshold:
+        console.log(f"Waiting till the probability is greater than {threshold:%}")
+        return
+
+    import atproto
     client = atproto.AsyncClient()
     keep_session_updated(client, state)
 
@@ -82,26 +118,15 @@ async def main():
         password = input("app password: ")
         await client.login(username, password)
 
-    block_records = await fetch_all_block_records(client)
+    await fetch_all_block_records(client, probability)
 
-    current_daystamp = daystamp()
-    time_period = current_daystamp - state.last_unblock_run_daystamp
-    probability = calculate_decay_probability(time_period, 180)
-    console.log("Days since last run:", time_period)
-    console.log(f"Probability of unblocking per account: {probability:%}")
 
-    for uri, record in block_records.items():
-        if random.random() >= probability:
-            # ...stays blocked.
-            continue
-
-        # unblock this account.
-        rkey = atproto.AtUri.from_str(uri).rkey
-        await client.app.bsky.graph.block.delete(repo=client.me.did, rkey=rkey)
-        console.log(f"unblocked: https://bsky.app/profile/{record.subject}")
+    console.log("waiting for tasks to complete")
+    await asyncio.gather(*background_tasks)
+    console.log("all tasks completed")
 
     state.last_unblock_run_daystamp = current_daystamp
     state.save()
 
 
-asyncio.run(main())
+asyncio.run(main(), debug=False)
