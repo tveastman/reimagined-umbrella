@@ -12,7 +12,7 @@ STATE_FILENAME = pathlib.Path.home() / ".bsky-half-life-unblocker-state.json"
 console = rich.console.Console()
 
 HALF_LIFE = 365.25 / 3.0
-THRESHOLD = 0.00
+THRESHOLD = 0.01
 
 
 def daystamp():
@@ -98,11 +98,13 @@ async def unblock(client, block_list, uri):
 
 
 async def randomly_unblock(client, block_list, probability):
+    all_items = list(block_list.items())
+    num = random.binomialvariate(len(all_items), probability)
+    console.log(f"unblocking {num} out of {len(all_items)}")
+    chosen_items = random.sample(all_items, num)
+
     async with asyncio.TaskGroup() as task_group:
-        for uri, record in list(block_list.items()):
-            if random.random() >= probability:
-                # ...stays blocked.
-                continue
+        for uri, record in chosen_items:
             task_group.create_task(
                 unblock(client, block_list, uri), name=f"unblock {uri}"
             )
