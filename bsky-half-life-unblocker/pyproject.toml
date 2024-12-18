@@ -6,7 +6,10 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "atproto>=0.0.56",
+    "click>=8.1.7",
+    "keyring>=25.5.0",
     "rich>=13.9.4",
+    "typer>=0.15.1",
 ]
 
 [dependency-groups]
