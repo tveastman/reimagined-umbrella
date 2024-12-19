@@ -184,9 +184,10 @@ async def iterate_over_all_followers(client, did):
             break
 
 
-async def add_followers_to_block_queue(state: State, client):
+async def add_followers_to_block_queue(state: State, handle: str):
+    client = await get_client(state)
     resolver = atproto.AsyncIdResolver()
-    did = await resolver.handle.resolve(sys.argv[1])
+    did = await resolver.handle.resolve(handle)
     assert did != client.me.did, "Don't try to block yourself"
     console.log("did", did, highlight=False)
     async for follower in iterate_over_all_followers(client, did):
@@ -194,22 +195,22 @@ async def add_followers_to_block_queue(state: State, client):
     console.log(f"{len(state.block_queue)=}")
 
 
-async def run_block_queue(state: State):
-    client = await get_client(state)
-    while state.block_queue:
-        did = state.block_queue.pop()
-        state.block_queue.add(did)
-        response = await client.app.bsky.graph.block.create(
-            repo=client.me.did,
-            record=atproto.models.app.bsky.graph.block.Record(
-                created_at=client.get_current_time_iso(), subject=did
-            ),
-        )
-        at_uri = atproto.AtUri.from_str(response.uri)
-        state.app_bsky_graph_block_list[at_uri.rkey] = did
-        state.block_queue.remove(did)
-        console.log(f"Blocked {did}", highlight=False)
-
+# async def run_block_queue(state: State):
+#     client = await get_client(state)
+#     while state.block_queue:
+#         did = state.block_queue.pop()
+#         state.block_queue.add(did)
+#         response = await client.app.bsky.graph.block.create(
+#             repo=client.me.did,
+#             record=atproto.models.app.bsky.graph.block.Record(
+#                 created_at=client.get_current_time_iso(), subject=did
+#             ),
+#         )
+#         at_uri = atproto.AtUri.from_str(response.uri)
+#         state.app_bsky_graph_block_list[at_uri.rkey] = did
+#         state.block_queue.remove(did)
+#         console.log(f"Blocked {did}", highlight=False)
+#
 
 async def run_block_queue_batched(state: State):
     batch_size = 200
@@ -246,6 +247,9 @@ async def run_block_queue_batched(state: State):
         if count >= 1_000:
             break
 
+async def update_block_list_main(state: State):
+    client = await get_client(state)
+    await update_block_list(client, state.app_bsky_graph_block_list)
 
 @app.command()
 def unblock():
@@ -257,6 +261,16 @@ def unblock():
 def block():
     with State.auto_load_and_save() as state:
         asyncio.run(run_block_queue_batched(state))
+@app.command()
+def update():
+    with State.auto_load_and_save() as state:
+        asyncio.run(update_block_list_main(state))
+
+@app.command()
+def block_followers(handle: str):
+    with State.auto_load_and_save() as state:
+        asyncio.run(add_followers_to_block_queue(state, handle))
+
 
 
 if __name__ == "__main__":
