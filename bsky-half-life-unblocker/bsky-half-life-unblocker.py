@@ -19,7 +19,7 @@ console = rich.console.Console()
 app = typer.Typer()
 
 HALF_LIFE = 365.25 / 3.0
-THRESHOLD = 0.01
+THRESHOLD = 0.002
 
 
 def daystamp():
@@ -99,7 +99,7 @@ async def update_block_list(client, block_list):
     console.log(f"new block records: {new_records}")
 
 
-async def unblock(client, block_list, rkey):
+async def unblock_rkey(client, block_list, rkey):
     did = block_list[rkey]
     link = f"https://bsky.app/profile/{did}"
     result = await client.app.bsky.graph.block.delete(repo=client.me.did, rkey=rkey)
@@ -119,7 +119,7 @@ async def randomly_unblock(client, block_list, probability):
     async with asyncio.TaskGroup() as task_group:
         for uri, record in chosen_items:
             task_group.create_task(
-                unblock(client, block_list, uri), name=f"unblock {uri}"
+                unblock_rkey(client, block_list, uri), name=f"unblock {uri}"
             )
 
 
