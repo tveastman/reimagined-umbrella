@@ -13,13 +13,13 @@ import sys
 import typer
 from rich.markup import escape
 
-STATE_FILENAME = pathlib.Path.home() / ".bsky-half-life-unblocker-state.json.gz"
+STATE_FILENAME = pathlib.Path.home() / ".bsky-state.json.gz"
 
 console = rich.console.Console()
 app = typer.Typer()
 
-HALF_LIFE = 365.25 / 3.0
-THRESHOLD = 0.002
+# HALF_LIFE = 365.25 / 3.0
+# THRESHOLD = 0.003
 
 
 def daystamp():
@@ -145,14 +145,13 @@ async def get_client(state: State) -> atproto.AsyncClient:
     return client
 
 
-async def half_life_unblocker_main(state: State):
+async def half_life_unblocker_main(state: State, half_life: float, threshold: float):
     current_daystamp = daystamp()
     time_period = current_daystamp - state.last_unblock_run_daystamp
-    probability = calculate_decay_probability(time_period, HALF_LIFE)
+    probability = calculate_decay_probability(time_period, half_life)
     console.log("Days since last run:", time_period)
     console.log(f"Probability of unblocking per account: {probability:%}")
 
-    threshold = THRESHOLD
     if probability < threshold:
         console.log(f"Waiting till the probability is greater than {threshold:%}")
         return
@@ -252,9 +251,9 @@ async def update_block_list_main(state: State):
     await update_block_list(client, state.app_bsky_graph_block_list)
 
 @app.command()
-def unblock():
+def unblock(half_life: float = 365.25 / 2, threshold: float = 0.002):
     with State.auto_load_and_save() as state:
-        asyncio.run(half_life_unblocker_main(state))
+        asyncio.run(half_life_unblocker_main(state, half_life, threshold))
 
 
 @app.command()
