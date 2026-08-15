@@ -1,0 +1,25 @@
+[project]
+name = "scoped-cache"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Tom Eastman", email = "tom@eastman.nz" }
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+scoped-cache = "scoped_cache:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "rich>=15.0.0",
+    "ruff>=0.16.3",
+]
